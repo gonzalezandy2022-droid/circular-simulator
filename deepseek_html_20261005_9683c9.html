@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulador Movimiento Circular · Leyes de Newton</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: radial-gradient(circle at 20% 0%, #1a2332 0%, #0a0e14 60%);
+    color: #e6e6e6;
+    margin: 0;
+    padding: 20px;
+    min-height: 100vh;
+  }
+  h1 {
+    text-align: center;
+    color: #4fc3f7;
+    font-size: 26px;
+    margin: 0 0 20px;
+    text-shadow: 0 0 20px #4fc3f750;
+  }
+  .contenedor {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  canvas {
+    background: #0d1219;
+    border: 2px solid #4fc3f7;
+    border-radius: 14px;
+    box-shadow: 0 0 30px #4fc3f730;
+    max-width: 100%;
+    height: auto;
+  }
+  .columna {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 300px;
+    max-width: 360px;
+    flex: 1;
+  }
+  .panel {
+    background: #161c26;
+    padding: 16px 18px;
+    border-radius: 12px;
+    border: 1px solid #223;
+    box-shadow: 0 4px 20px #00000080;
+  }
+  .panel h2 {
+    margin: 0 0 12px;
+    color: #4fc3f7;
+    font-size: 15px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-bottom: 1px solid #223;
+    padding-bottom: 8px;
+  }
+  label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    margin: 12px 0 4px;
+    color: #b8c4d4;
+  }
+  label .val {
+    color: #ffcc00;
+    font-weight: bold;
+    font-variant-numeric: tabular-nums;
+  }
+  input[type=range] {
+    width: 100%;
+    accent-color: #4fc3f7;
+    cursor: pointer;
+  }
+  .fila-dato {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    padding: 6px 0;
+    border-bottom: 1px dashed #223;
+    font-variant-numeric: tabular-nums;
+  }
+  .fila-dato:last-child { border-bottom: none; }
+  .fila-dato span:last-child {
+    color: #4fc3f7;
+    font-weight: bold;
+  }
+  .fila-dato.destacado span:last-child { color: #ff5252; }
+  .fila-dato.energia span:last-child { color: #00e676; }
+  .fila-dato.angular span:last-child { color: #ba68c8; }
+
+  .toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 8px 0;
+    font-size: 13px;
+    color: #b8c4d4;
+    cursor: pointer;
+  }
+  .toggle input { accent-color: #4fc3f7; cursor: pointer; }
+
+  .botones {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  button {
+    flex: 1;
+    min-width: 90px;
+    background: linear-gradient(135deg, #4fc3f7, #29b6f6);
+    border: none;
+    color: #0a0e14;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 13px;
+    transition: transform .15s, box-shadow .15s;
+  }
+  button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px #4fc3f760;
+  }
+  button.secundario {
+    background: linear-gradient(135deg, #37474f, #263238);
+    color: #e6e6e6;
+  }
+  .presets {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .presets button {
+    flex: 1 1 45%;
+    font-size: 11px;
+    padding: 6px;
+    background: #263238;
+    color: #90caf9;
+  }
+  .presets button:hover { background: #37474f; }
+
+  .formula {
+    font-size: 12px;
+    color: #90a4ae;
+    line-height: 1.6;
+    background: #0d1219;
+    padding: 10px;
+    border-radius: 8px;
+    border-left: 3px solid #4fc3f7;
+    margin-top: 8px;
+  }
+  .formula b { color: #4fc3f7; }
+  .formula code {
+    color: #ffcc00;
+    font-family: 'Consolas', monospace;
+  }
+  @media (max-width: 900px) {
+    .columna { max-width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<h1>🎡 Simulador de Movimiento Circular · Leyes de Newton</h1>
+
+<div class="contenedor">
+
+  <!-- CANVAS -->
+  <div>
+    <canvas id="lienzo" width="640" height="640"></canvas>
+  </div>
+
+  <!-- COLUMNA IZQUIERDA: CONTROLES -->
+  <div class="columna">
+
+    <div class="panel">
+      <h2>⚙️ Variables de control</h2>
+
+      <label>Masa (m) <span class="val" id="vMasa">1.00</span> kg</label>
+      <input type="range" id="masa" min="0.1" max="10" step="0.05" value="1">
+
+      <label>Radio (r) <span class="val" id="vRadio">1.50</span> m</label>
+      <input type="range" id="radio" min="0.3" max="3" step="0.05" value="1.5">
+
+      <label>Velocidad angular (ω) <span class="val" id="vOmega">2.00</span> rad/s</label>
+      <input type="range" id="omega" min="0" max="8" step="0.05" value="2">
+
+      <label>Aceleración angular (α) <span class="val" id="vAlpha">0.00</span> rad/s²</label>
+      <input type="range" id="alpha" min="-3" max="3" step="0.05" value="0">
+
+      <label>Gravedad (g) <span class="val" id="vG">9.80</span> m/s²</label>
+      <input type="range" id="gravedad" min="0" max="20" step="0.1" value="9.8">
+
+      <label>Coef. fricción (μ) <span class="val" id="vMu">0.00</span></label>
+      <input type="range" id="mu" min="0" max="1" step="0.01" value="0">
+
+      <div class="botones">
+        <button id="pausa">⏸ Pausar</button>
+        <button id="reset" class="secundario">🔄 Reiniciar</button>
+      </div>
+
+      <div class="presets">
+        <button data-preset="basico">Básico</button>
+        <button data-preset="rapido">Rápido</button>
+        <button data-preset="lento">Lento</button>
+        <button data-preset="acelerado">Acelerado (α&gt;0)</button>
+        <button data-preset="frenado">Frenado (α&lt;0)</button>
+        <button data-preset="grande">Órbita grande</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>👁️ Visualización</h2>
+      <label class="toggle"><input type="checkbox" id="mostrarFuerzas" checked> Vector Fuerza centrípeta (F<sub>c</sub>)</label>
+      <label class="toggle"><input type="checkbox" id="mostrarReaccion" checked> Fuerza de reacción (3ª ley)</label>
+      <label class="toggle"><input type="checkbox" id="mostrarVel"> Vector Velocidad (v)</label>
+      <label class="toggle"><input type="checkbox" id="mostrarTangencial"> Vector Fuerza tangencial (F<sub>t</sub>)</label>
+      <label class="toggle"><input type="checkbox" id="mostrarAceleracion"> Vector Aceleración total (a)</label>
+      <label class="toggle"><input type="checkbox" id="mostrarTrayectoria" checked> Trayectoria circular</label>
+      <label class="toggle"><input type="checkbox" id="mostrarRadio"> Radio vector (r)</label>
+      <label class="toggle"><input type="checkbox" id="mostrarEstela" checked> Estela del móvil</label>
+    </div>
+
+  </div>
+
+  <!-- COLUMNA DERECHA: DATOS -->
+  <div class="columna">
+
+    <div class="panel">
+      <h2>📊 Cinemática</h2>
+      <div class="fila-dato"><span>Ángulo (θ)</span><span id="dTheta">0.00 rad</span></div>
+      <div class="fila-dato"><span>Revoluciones (N)</span><span id="dRev">0.00</span></div>
+      <div class="fila-dato"><span>Velocidad angular (ω)</span><span id="dOmega">0</span></div>
+      <div class="fila-dato"><span>Velocidad lineal (v)</span><span id="dVel">0 m/s</span></div>
+      <div class="fila-dato"><span>Aceleración angular (α)</span><span id="dAlpha">0</span></div>
+      <div class="fila-dato"><span>Aceleración centrípeta (a<sub>c</sub>)</span><span id="dAc">0 m/s²</span></div>
+      <div class="fila-dato"><span>Aceleración tangencial (a<sub>t</sub>)</span><span id="dAt">0 m/s²</span></div>
+      <div class="fila-dato"><span>Aceleración total (a)</span><span id="dA">0 m/s²</span></div>
+      <div class="fila-dato"><span>Período (T)</span><span id="dT">∞ s</span></div>
+      <div class="fila-dato"><span>Frecuencia (f)</span><span id="dF">0 Hz</span></div>
+    </div>
+
+    <div class="panel">
+      <h2>💪 Dinámica (Leyes de Newton)</h2>
+      <div class="fila-dato destacado"><span>Fuerza centrípeta (F<sub>c</sub>)</span><span id="dFc">0 N</span></div>
+      <div class="fila-dato destacado"><span>Fuerza tangencial (F<sub>t</sub>)</span><span id="dFt">0 N</span></div>
+      <div class="fila-dato destacado"><span>Fuerza total (F)</span><span id="dFtot">0 N</span></div>
+      <div class="fila-dato"><span>Torque / Momento (τ)</span><span id="dTau">0 N·m</span></div>
+      <div class="fila-dato"><span>Fuerza de fricción máx (μ·m·g)</span><span id="dFric">0 N</span></div>
+      <div class="fila-dato"><span>¿Fricción suficiente?</span><span id="dFricOk">—</span></div>
+    </div>
+
+    <div class="panel">
+      <h2>🌀 Magnitudes angulares y energía</h2>
+      <div class="fila-dato angular"><span>Momento de inercia (I)</span><span id="dI">0 kg·m²</span></div>
+      <div class="fila-dato angular"><span>Momento angular (L)</span><span id="dL">0 kg·m²/s</span></div>
+      <div class="fila-dato energia"><span>Energía cinética (K)</span><span id="dK">0 J</span></div>
+      <div class="fila-dato energia"><span>Energía rotacional (K<sub>rot</sub>)</span><span id="dKrot">0 J</span></div>
+      <div class="fila-dato energia"><span>Potencia instantánea (P)</span><span id="dP">0 W</span></div>
+      <div class="fila-dato energia"><span>Trabajo acumulado (W)</span><span id="dW">0 J</span></div>
+    </div>
+
+    <div class="panel">
+      <h2>📐 Fórmulas activas</h2>
+      <div class="formula">
+        <b>2ª Ley radial:</b> <code>F_c = m·ω²·r = m·v²/r</code><br>
+        <b>2ª Ley tangencial:</b> <code>F_t = m·α·r</code><br>
+        <b>Velocidad:</b> <code>v = ω·r</code><br>
+        <b>Período:</b> <code>T = 2π/ω</code><br>
+        <b>Momento angular:</b> <code>L = I·ω = m·r²·ω</code><br>
+        <b>Energía cinética:</b> <code>K = ½·m·v² = ½·I·ω²</code><br>
+        <b>Torque:</b> <code>τ = I·α = F_t·r</code>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+/* =========================================================
+   SIMULADOR DE MOVIMIENTO CIRCULAR CON LEYES DE NEWTON
+   ========================================================= */
+
+const canvas = document.getElementById("lienzo");
+const ctx = canvas.getContext("2d");
+const cx = canvas.width / 2;
+const cy = canvas.height / 2;
+let escala = 90; // px por metro (se ajusta dinámicamente)
+
+// Estado físico
+let theta = 0;          // ángulo (rad)
+let omegaActual = 2;    // ω real (puede cambiar por α)
+let trabajoAcum = 0;    // trabajo total
+let tiempoTotal = 0;
+
+// Estela
+const estela = [];
+const MAX_ESTELA = 60;
+
+// Pausa
+let pausado = false;
+let ultimoT = performance.now();
+
+// Elementos de control
+const masaEl      = document.getElementById("masa");
+const radioEl     = document.getElementById("radio");
+const omegaEl     = document.getElementById("omega");
+const alphaEl     = document.getElementById("alpha");
+const gEl         = document.getElementById("gravedad");
+const muEl        = document.getElementById("mu");
+
+const mostrarFuerzas     = document.getElementById("mostrarFuerzas");
+const mostrarReaccion    = document.getElementById("mostrarReaccion");
+const mostrarVel         = document.getElementById("mostrarVel");
+const mostrarTangencial  = document.getElementById("mostrarTangencial");
+const mostrarAceleracion = document.getElementById("mostrarAceleracion");
+const mostrarTrayectoria = document.getElementById("mostrarTrayectoria");
+const mostrarRadio       = document.getElementById("mostrarRadio");
+const mostrarEstela      = document.getElementById("mostrarEstela");
+
+// Actualizar etiquetas de sliders
+function actualizarEtiquetas() {
+  document.getElementById("vMasa").textContent  = parseFloat(masaEl.value).toFixed(2);
+  document.getElementById("vRadio").textContent = parseFloat(radioEl.value).toFixed(2);
+  document.getElementById("vOmega").textContent = parseFloat(omegaEl.value).toFixed(2);
+  document.getElementById("vAlpha").textContent = parseFloat(alphaEl.value).toFixed(2);
+  document.getElementById("vG").textContent     = parseFloat(gEl.value).toFixed(2);
+  document.getElementById("vMu").textContent    = parseFloat(muEl.value).toFixed(2);
+}
+[masaEl, radioEl, omegaEl, alphaEl, gEl, muEl].forEach(el =>
+  el.addEventListener("input", actualizarEtiquetas)
+);
+
+// Al mover ω se sincroniza ω actual (reiniciamos acumulación)
+omegaEl.addEventListener("input", () => {
+  omegaActual = parseFloat(omegaEl.value);
+});
+
+// Botones
+document.getElementById("pausa").addEventListener("click", e => {
+  pausado = !pausado;
+  e.target.textContent = pausado ? "▶ Reanudar" : "⏸ Pausar";
+});
+document.getElementById("reset").addEventListener("click", () => {
+  theta = 0;
+  omegaActual = parseFloat(omegaEl.value);
+  trabajoAcum = 0;
+  tiempoTotal = 0;
+  estela.length = 0;
+  pausado = false;
+  document.getElementById("pausa").textContent = "⏸ Pausar";
+});
+
+// Presets
+document.querySelectorAll("[data-preset]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const p = btn.dataset.preset;
+    const set = (m, r, w, a, mu) => {
+      masaEl.value = m; radioEl.value = r; omegaEl.value = w;
+      alphaEl.value = a; muEl.value = mu;
+      omegaActual = w;
+      actualizarEtiquetas();
+      theta = 0; trabajoAcum = 0; tiempoTotal = 0; estela.length = 0;
+    };
+    if (p === "basico")    set(1, 1.5, 2, 0, 0);
+    if (p === "rapido")    set(1, 1.5, 6, 0, 0);
+    if (p === "lento")     set(1, 1.5, 0.5, 0, 0);
+    if (p === "acelerado") set(1.5, 1.5, 1, 0.5, 0);
+    if (p === "frenado")   set(1.5, 1.5, 6, -0.5, 0);
+    if (p === "grande")    set(2, 2.8, 2, 0, 0.3);
+  });
+});
+
+// Flecha con punta
+function dibujarFlecha(x1, y1, x2, y2, color, grosor = 3, etiqueta = "") {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.hypot(dx, dy);
+  if (len < 2) return;
+  const ang = Math.atan2(dy, dx);
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = grosor;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+  const cabeza = 10;
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - cabeza * Math.cos(ang - Math.PI / 6),
+             y2 - cabeza * Math.sin(ang - Math.PI / 6));
+  ctx.lineTo(x2 - cabeza * Math.cos(ang + Math.PI / 6),
+             y2 - cabeza * Math.sin(ang + Math.PI / 6));
+  ctx.closePath();
+  ctx.fill();
+  if (etiqueta) {
+    ctx.font = "bold 14px Arial";
+    ctx.fillText(etiqueta, x2 + 8, y2 - 6);
+  }
+}
+
+// Bucle principal
+function loop(t) {
+  const dt = Math.min((t - ultimoT) / 1000, 0.05);
+  ultimoT = t;
+
+  // Leer valores actuales
+  const m = parseFloat(masaEl.value);
+  const r = parseFloat(radioEl.value);
+  const alpha = parseFloat(alphaEl.value);
+  const g = parseFloat(gEl.value);
+  const mu = parseFloat(muEl.value);
+
+  // Ajustar escala si el radio es grande
+  escala = Math.min(90, (canvas.width / 2 - 60) / r);
+
+  // ==== FÍSICA ====
+  if (!pausado) {
+    tiempoTotal += dt;
+    // Si hay α, evoluciona ω
+    if (alpha !== 0) {
+      omegaActual += alpha * dt;
+      if (omegaActual < 0) omegaActual = 0;
+    } else {
+      omegaActual = parseFloat(omegaEl.value);
+    }
+    theta += omegaActual * dt + 0.5 * alpha * dt * dt;
+  }
+  const omega = omegaActual;
+
+  // Cinemática
+  const v  = omega * r;
+  const ac = omega * omega * r;
+  const at = alpha * r;
+  const aTotal = Math.hypot(ac, at);
+  const T = omega > 0 ? (2 * Math.PI / omega) : Infinity;
+  const f = omega > 0 ? 1 / T : 0;
+
+  // Dinámica
+  const Fc  = m * ac;
+  const Ft  = m * at;
+  const Ftot = Math.hypot(Fc, Ft);
+  const tau = Ft * r;
+  const fricMax = mu * m * g;
+  const fricOk = mu > 0 ? (Fc <= fricMax ? "✅ Sí" : "❌ No") : "—";
+
+  // Magnitudes angulares y energía
+  const I = m * r * r;
+  const L = I * omega;
+  const K = 0.5 * m * v * v;
+  const Krot = 0.5 * I * omega * omega;
+  const P = Ft * v;                 // potencia instantánea
+  if (!pausado) trabajoAcum += P * dt;
+
+  // ==== ACTUALIZAR DOM ====
+  const rev = theta / (2 * Math.PI);
+  document.getElementById("dTheta").textContent = theta.toFixed(2) + " rad";
+  document.getElementById("dRev").textContent   = rev.toFixed(2);
+  document.getElementById("dOmega").textContent = omega.toFixed(2) + " rad/s";
+  document.getElementById("dVel").textContent   = v.toFixed(2) + " m/s";
+  document.getElementById("dAlpha").textContent = alpha.toFixed(2) + " rad/s²";
+  document.getElementById("dAc").textContent    = ac.toFixed(2) + " m/s²";
+  document.getElementById("dAt").textContent    = at.toFixed(2) + " m/s²";
+  document.getElementById("dA").textContent     = aTotal.toFixed(2) + " m/s²";
+  document.getElementById("dT").textContent     = isFinite(T) ? T.toFixed(3) + " s" : "∞ s";
+  document.getElementById("dF").textContent     = f.toFixed(3) + " Hz";
+
+  document.getElementById("dFc").textContent    = Fc.toFixed(2) + " N";
+  document.getElementById("dFt").textContent    = Ft.toFixed(2) + " N";
+  document.getElementById("dFtot").textContent  = Ftot.toFixed(2) + " N";
+  document.getElementById("dTau").textContent   = tau.toFixed(2) + " N·m";
+  document.getElementById("dFric").textContent  = fricMax.toFixed(2) + " N";
+  document.getElementById("dFricOk").textContent = fricOk;
+
+  document.getElementById("dI").textContent     = I.toFixed(3) + " kg·m²";
+  document.getElementById("dL").textContent     = L.toFixed(3) + " kg·m²/s";
+  document.getElementById("dK").textContent     = K.toFixed(2) + " J";
+  document.getElementById("dKrot").textContent  = Krot.toFixed(2) + " J";
+  document.getElementById("dP").textContent     = P.toFixed(2) + " W";
+  document.getElementById("dW").textContent     = trabajoAcum.toFixed(2) + " J";
+
+  // ==== DIBUJO ====
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const R = r * escala;
+  const px = cx + R * Math.cos(theta);
+  const py = cy + R * Math.sin(theta);
+
+  // Estela
+  if (mostrarEstela.checked) {
+    estela.push({ x: px, y: py });
+    if (estela.length > MAX_ESTELA) estela.shift();
+    for (let i = 0; i < estela.length; i++) {
+      const alfa = i / estela.length;
+      ctx.fillStyle = `rgba(255, 204, 0, ${alfa * 0.6})`;
+      ctx.beginPath();
+      ctx.arc(estela[i].x, estela[i].y, 3 + alfa * 3, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+  } else {
+    estela.length = 0;
+  }
+
+  // Trayectoria
+  if (mostrarTrayectoria.checked) {
+    ctx.strokeStyle = "#2c3645";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 6]);
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, 2 * Math.PI);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Centro / eje
+  ctx.fillStyle = "#4fc3f7";
+  ctx.beginPath();
+  ctx.arc(cx, cy, 7, 0, 2 * Math.PI);
+  ctx.fill();
+  ctx.strokeStyle = "#fff";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.fillStyle = "#90a4ae";
+  ctx.font = "13px Arial";
+  ctx.fillText("Eje / centro", cx + 12, cy - 12);
+
+  // Radio vector
+  if (mostrarRadio.checked) {
+    ctx.strokeStyle = "#546e7a";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(px, py);
+    ctx.stroke();
+    // etiqueta r
+    const mx = (cx + px) / 2, my = (cy + py) / 2;
+    ctx.fillStyle = "#90a4ae";
+    ctx.font = "italic 13px Arial";
+    ctx.fillText("r = " + r.toFixed(2) + " m", mx + 6, my - 6);
+  }
+
+  // Cuerda (si no mostramos radio, se ve igual)
+  ctx.strokeStyle = "#78909c";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(px, py);
+  ctx.stroke();
+
+  // ==== VECTORES ====
+  const uxRad = Math.cos(theta);          // unitario saliente (radial)
+  const uyRad = Math.sin(theta);
+  const uxTan = -Math.sin(theta);         // unitario tangencial
+  const uyTan = Math.cos(theta);
+
+  // Velocidad tangencial
+  if (mostrarVel.checked && v > 0.001) {
+    const largo = Math.min(v * 22, 130);
+    dibujarFlecha(px, py, px + uxTan * largo, py + uyTan * largo,
+                  "#00e676", 3, "v");
+  }
+
+  // Fuerza centrípeta (hacia el centro)
+  if (mostrarFuerzas.checked && Fc > 0.001) {
+    const largo = Math.min(Fc * 5, 160);
+    dibujarFlecha(px, py, px - uxRad * largo, py - uyRad * largo,
+                  "#ff5252", 3.5, "Fc");
+  }
+
+  // Fuerza tangencial
+  if (mostrarTangencial.checked && Math.abs(Ft) > 0.001) {
+    const signo = Ft > 0 ? 1 : -1;
+    const largo = Math.min(Math.abs(Ft) * 5, 140);
+    dibujarFlecha(px, py, px + uxTan * largo * signo, py + uyTan * largo * signo,
+                  "#ff9800", 3, "Ft");
+  }
+
+  // Aceleración total
+  if (mostrarAceleracion.checked && aTotal > 0.001) {
+    const ax = -uxRad * ac + uxTan * at;
+    const ay = -uyRad * ac + uyTan * at;
+    const magA = Math.hypot(ax, ay);
+    const largo = Math.min(magA * 12, 120);
+    dibujarFlecha(px, py, px + (ax / magA) * largo, py + (ay / magA) * largo,
+                  "#ba68c8", 2.5, "a");
+  }
+
+  // Reacción (3ª ley) sobre el eje
+  if (mostrarReaccion.checked && Fc > 0.001) {
+    const largo = Math.min(Fc * 3, 100);
+    dibujarFlecha(cx, cy, cx + uxRad * largo, cy + uyRad * largo,
+                  "#ffab40", 2.5, "F reacción");
+  }
+
+  // Bola
+  const grad = ctx.createRadialGradient(px - 4, py - 4, 2, px, py, 16);
+  grad.addColorStop(0, "#fff59d");
+  grad.addColorStop(1, "#fbc02d");
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(px, py, 14, 0, 2 * Math.PI);
+  ctx.fill();
+  ctx.strokeStyle = "#fff";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Etiqueta masa
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 13px Arial";
+  ctx.fillText("m = " + m.toFixed(2) + " kg", px + 18, py + 22);
+
+  requestAnimationFrame(loop);
+}
+
+// Inicializar
+actualizarEtiquetas();
+omegaActual = parseFloat(omegaEl.value);
+requestAnimationFrame(loop);
+</script>
+
+</body>
+</html>
