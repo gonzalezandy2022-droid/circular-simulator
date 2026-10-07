@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Simulador: Desaceleración con Fricción</title>
+<style>
+  * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+  body {
+    margin: 0; padding: 20px;
+    background: linear-gradient(135deg, #1e3c72, #2a5298);
+    color: #fff; min-height: 100vh;
+  }
+  h1 { text-align: center; margin-bottom: 10px; }
+  .container {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 20px;
+    max-width: 1200px;
+    margin: auto;
+  }
+  .panel {
+    background: rgba(255,255,255,0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+  }
+  label { display: block; margin-top: 12px; font-size: 0.9em; }
+  input[type=range] { width: 100%; }
+  input[type=number] {
+    width: 90px; padding: 4px; border-radius: 6px; border: none;
+    background: #ffffff20; color: #fff; text-align: right;
+  }
+  .row { display: flex; justify-content: space-between; align-items: center; }
+  button {
+    width: 100%; padding: 12px; margin-top: 15px; border: none;
+    border-radius: 10px; cursor: pointer; font-weight: bold;
+    font-size: 1em; transition: 0.2s;
+  }
+  #btnPlay { background: #00c896; color: white; }
+  #btnPlay:hover { background: #00a87e; }
+  #btnReset { background: #ff6b6b; color: white; }
+  #btnReset:hover { background: #e04b4b; }
+  .stats {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+    margin-top: 15px;
+  }
+  .stat {
+    background: rgba(0,0,0,0.25);
+    padding: 10px; border-radius: 8px; text-align: center;
+  }
+  .stat span { display: block; font-size: 0.75em; opacity: 0.8; }
+  .stat b { font-size: 1.2em; color: #ffd93d; }
+  canvas { background: #0d1b2a; border-radius: 12px; width: 100%; }
+  .tabs { display: flex; gap: 5px; margin-top: 10px; }
+  .tabs button {
+    margin: 0; padding: 8px; background: #ffffff20; color: #fff;
+    border-radius: 8px; font-size: 0.85em;
+  }
+  .tabs button.active { background: #4a90e2; }
+</style>
+</head>
+<body>
+
+<h1>🚗 Simulador: Desaceleración por Fricción</h1>
+
+<div class="container">
+  <!-- PANEL DE CONTROL -->
+  <div class="panel">
+    <h3>⚙️ Parámetros</h3>
+
+    <label>Masa del carrito (kg):</label>
+    <div class="row">
+      <input type="range" id="masa" min="1" max="200" value="50" step="1">
+      <input type="number" id="masaN" value="50">
+    </div>
+
+    <label>Velocidad inicial (m/s):</label>
+    <div class="row">
+      <input type="range" id="vel" min="1" max="50" value="20" step="1">
+      <input type="number" id="velN" value="20">
+    </div>
+
+    <label>Coeficiente de fricción (μ):</label>
+    <div class="row">
+      <input type="range" id="mu" min="0" max="1.5" value="0.3" step="0.01">
+      <input type="number" id="muN" value="0.3" step="0.01">
+    </div>
+
+    <label>Ángulo de inclinación (°):</label>
+    <div class="row">
+      <input type="range" id="ang" min="0" max="45" value="0" step="1">
+      <input type="number" id="angN" value="0">
+    </div>
+
+    <label>Gravedad (m/s²):</label>
+    <div class="row">
+      <input type="range" id="g" min="1" max="20" value="9.81" step="0.01">
+      <input type="number" id="gN" value="9.81" step="0.01">
+    </div>
+
+    <div class="tabs">
+      <button onclick="setPreset(9.81)">🌍 Tierra</button>
+      <button onclick="setPreset(1.62)">🌙 Luna</button>
+      <button onclick="setPreset(3.71)">🔴 Marte</button>
+    </div>
+
+    <button id="btnPlay">▶ Iniciar simulación</button>
+    <button id="btnReset">⟲ Reiniciar</button>
+
+    <div class="stats">
+      <div class="stat"><span>Fuerza de fricción</span><b id="sFric">0 N</b></div>
+      <div class="stat"><span>Aceleración</span><b id="sAcel">0 m/s²</b></div>
+      <div class="stat"><span>Tiempo de parada</span><b id="sTiempo">0 s</b></div>
+      <div class="stat"><span>Distancia total</span><b id="sDist">0 m</b></div>
+      <div class="stat"><span>Velocidad actual</span><b id="sVelAct">0 m/s</b></div>
+      <div class="stat"><span>Fuerza neta</span><b id="sFneta">0 N</b></div>
+    </div>
+  </div>
+
+  <!-- VISUALIZACIÓN -->
+  <div class="panel">
+    <canvas id="escena" width="800" height="280"></canvas>
+    <canvas id="grafica" width="800" height="240" style="margin-top:15px"></canvas>
+  </div>
+</div>
+
+<script>
+// ============ ESTADO ============
+const state = {
+  masa: 50, v0: 20, mu: 0.3, ang: 0, g: 9.81,
+  x: 0, v: 20, t: 0, running: false,
+  distanciaTotal: 0, tiempoTotal: 0, a: 0,
+  historial: [] // {t, v, x}
+};
+
+const canvas = document.getElementById('escena');
+const ctx = canvas.getContext('2d');
+const gcanvas = document.getElementById('grafica');
+const gctx = gcanvas.getContext('2d');
+
+// ============ CONTROLES ============
+const ids = ['masa','vel','mu','ang','g'];
+ids.forEach(id => {
+  const range = document.getElementById(id);
+  const num   = document.getElementById(id + 'N');
+  range.addEventListener('input', () => {
+    num.value = range.value;
+    sincronizar();
+  });
+  num.addEventListener('input', () => {
+    range.value = num.value;
+    sincronizar();
+  });
+});
+
+function setPreset(gval) {
+  document.getElementById('g').value = gval;
+  document.getElementById('gN').value = gval;
+  sincronizar();
+}
+
+function sincronizar() {
+  state.masa = parseFloat(document.getElementById('masaN').value);
+  state.v0   = parseFloat(document.getElementById('velN').value);
+  state.mu   = parseFloat(document.getElementById('muN').value);
+  state.ang  = parseFloat(document.getElementById('angN').value);
+  state.g    = parseFloat(document.getElementById('gN').value);
+  reset();
+}
+
+// ============ FÍSICA ============
+function calcularFisica() {
+  const rad = state.ang * Math.PI / 180;
+  // Componente gravitatoria paralela al plano (empuja hacia atrás si sube)
+  const Fgravedad = state.masa * state.g * Math.sin(rad);
+  // Fricción cinética
+  const Ffric = state.mu * state.masa * state.g * Math.cos(rad);
+  // Fuerza neta (desaceleración = -gravedad - fricción)
+  const Fneta = Fgravedad + Ffric;
+  const a = -Fneta / state.masa;
+  return { Ffric, a, Fgravedad, Fneta };
+}
+
+// ============ RESET ============
+function reset() {
+  const { Ffric, a, Fneta } = calcularFisica();
+  state.a = a;
+  state.x = 0;
+  state.v = state.v0;
+  state.t = 0;
+  state.running = false;
+  state.historial = [{t:0, v:state.v0, x:0}];
+
+  if (Math.abs(a) < 0.001) {
+    state.tiempoTotal = Infinity;
+    state.distanciaTotal = Infinity;
+  } else {
+    state.tiempoTotal = state.v0 / Math.abs(a);
+    state.distanciaTotal = (state.v0 * state.v0) / (2 * Math.abs(a));
+  }
+
+  actualizarStats(Ffric, a, Fneta);
+  dibujarEscena();
+  dibujarGrafica();
+}
+
+// ============ STATS ============
+function actualizarStats(Ffric, a, Fneta) {
+  document.getElementById('sFric').textContent  = Ffric.toFixed(2) + ' N';
+  document.getElementById('sAcel').textContent  = a.toFixed(3) + ' m/s²';
+  document.getElementById('sFneta').textContent = Fneta.toFixed(2) + ' N';
+  document.getElementById('sVelAct').textContent = state.v.toFixed(2) + ' m/s';
+  document.getElementById('sTiempo').textContent =
+    isFinite(state.tiempoTotal) ? state.tiempoTotal.toFixed(2) + ' s' : '∞';
+  document.getElementById('sDist').textContent =
+    isFinite(state.distanciaTotal) ? state.distanciaTotal.toFixed(2) + ' m' : '∞';
+}
+
+// ============ ESCENA ============
+function dibujarEscena() {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Fondo cielo
+  const grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0, '#0d1b2a');
+  grad.addColorStop(1, '#1b3a4b');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Suelo inclinado
+  const rad = state.ang * Math.PI / 180;
+  const baseY = H - 60;
+  const escala = 8; // px por metro
+  const largo = W - 100;
+
+  ctx.save();
+  ctx.translate(50, baseY);
+  ctx.rotate(-rad); // rotamos hacia arriba
+
+  // Línea del plano
+  ctx.strokeStyle = '#4a90e2';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(largo / Math.cos(rad), 0);
+  ctx.stroke();
+
+  // Relleno del plano
+  ctx.fillStyle = 'rgba(74,144,226,0.15)';
+  ctx.lineTo(largo / Math.cos(rad), 80);
+  ctx.lineTo(0, 80);
+  ctx.closePath();
+  ctx.fill();
+
+  // Marcas cada 10 m
+  ctx.fillStyle = '#ffffff60';
+  ctx.font = '12px sans-serif';
+  for (let m = 0; m <= 100; m += 10) {
+    const px = m * escala;
+    if (px > largo) break;
+    ctx.fillRect(px, -5, 1, 10);
+    ctx.fillText(m + 'm', px + 3, 20);
+  }
+
+  // Carrito
+  const carX = Math.min(state.x * escala, largo - 80);
+  const carY = -18;
+  dibujarCarrito(ctx, carX, carY, state.v);
+
+  ctx.restore();
+
+  // Flechas de fuerzas (orientativas arriba)
+  dibujarFlechas(W, H);
+
+  // Texto informativo
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 16px sans-serif';
+  ctx.fillText(`t = ${state.t.toFixed(2)} s   |   x = ${state.x.toFixed(2)} m   |   v = ${state.v.toFixed(2)} m/s`, 20, 30);
+}
+
+function dibujarCarrito(ctx, x, y, v) {
+  // Cuerpo
+  ctx.fillStyle = v > 0.1 ? '#ff6b6b' : '#888';
+  ctx.beginPath();
+  ctx.roundRect(x, y - 25, 70, 25, 5);
+  ctx.fill();
+
+  // Cabina
+  ctx.fillStyle = '#ffd93d';
+  ctx.beginPath();
+  ctx.roundRect(x + 15, y - 45, 35, 22, 4);
+  ctx.fill();
+
+  // Ventanas
+  ctx.fillStyle = '#333';
+  ctx.fillRect(x + 20, y - 42, 10, 14);
+  ctx.fillRect(x + 35, y - 42, 10, 14);
+
+  // Ruedas
+  ctx.fillStyle = '#222';
+  [x + 15, x + 55].forEach(wx => {
+    ctx.beginPath();
+    ctx.arc(wx, y, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#555';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  });
+
+  // Flecha de velocidad
+  if (v > 0.1) {
+    ctx.strokeStyle = '#00ff88';
+    ctx.fillStyle = '#00ff88';
+    ctx.lineWidth = 3;
+    const len = Math.min(v * 3, 80);
+    ctx.beginPath();
+    ctx.moveTo(x + 70, y - 35);
+    ctx.lineTo(x + 70 + len, y - 35);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x + 70 + len, y - 35);
+    ctx.lineTo(x + 70 + len - 10, y - 40);
+    ctx.lineTo(x + 70 + len - 10, y - 30);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+function dibujarFlechas(W, H) {
+  const rad = state.ang * Math.PI / 180;
+  // Mostramos indicadores arriba a la derecha
+  const Fg = state.masa * state.g;
+  ctx.font = '13px sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#ff9f43';
+  ctx.fillText(`Peso: ${Fg.toFixed(1)} N`, W - 20, 30);
+  ctx.fillStyle = '#00c896';
+  const Ffric = state.mu * state.masa * state.g * Math.cos(rad);
+  ctx.fillText(`Fricción: ${Ffric.toFixed(1)} N`, W - 20, 50);
+  ctx.textAlign = 'left';
+}
+
+// ============ GRÁFICA ============
+function dibujarGrafica() {
+  const W = gcanvas.width, H = gcanvas.height;
+  gctx.clearRect(0, 0, W, H);
+  gctx.fillStyle = '#0d1b2a';
+  gctx.fillRect(0, 0, W, H);
+
+  // Ejes
+  gctx.strokeStyle = '#ffffff40';
+  gctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = 20 + (H - 40) * i / 4;
+    gctx.beginPath(); gctx.moveTo(50, y); gctx.lineTo(W - 20, y); gctx.stroke();
+  }
+
+  const tmax = isFinite(state.tiempoTotal) ? state.tiempoTotal * 1.1 : 10;
+  const vmax = state.v0 * 1.1;
+  const xmax = isFinite(state.distanciaTotal) ? state.distanciaTotal * 1.1 : state.v0 * tmax;
+
+  // Curva de velocidad (verde)
+  gctx.strokeStyle = '#00ff88';
+  gctx.lineWidth = 2.5;
+  gctx.beginPath();
+  let primero = true;
+  for (let i = 0; i < state.historial.length; i++) {
+    const p = state.historial[i];
+    const px = 50 + (W - 70) * (p.t / tmax);
+    const py = H - 20 - (H - 40) * (p.v / vmax);
+    if (primero) { gctx.moveTo(px, py); primero = false; }
+    else gctx.lineTo(px, py);
+  }
+  gctx.stroke();
+
+  // Curva de posición (amarillo)
+  gctx.strokeStyle = '#ffd93d';
+  gctx.beginPath();
+  primero = true;
+  for (let i = 0; i < state.historial.length; i++) {
+    const p = state.historial[i];
+    const px = 50 + (W - 70) * (p.t / tmax);
+    const py = H - 20 - (H - 40) * (p.x / xmax);
+    if (primero) { gctx.moveTo(px, py); primero = false; }
+    else gctx.lineTo(px, py);
+  }
+  gctx.stroke();
+
+  // Etiquetas
+  gctx.fillStyle = '#fff';
+  gctx.font = '12px sans-serif';
+  gctx.fillText('t (s)', W - 40, H - 5);
+  gctx.fillStyle = '#00ff88';
+  gctx.fillText('v (m/s)', 5, 15);
+  gctx.fillStyle = '#ffd93d';
+  gctx.fillText('x (m)', 60, 15);
+}
+
+// ============ ANIMACIÓN ============
+let lastTime = 0;
+function loop(timestamp) {
+  if (!lastTime) lastTime = timestamp;
+  const dt = (timestamp - lastTime) / 1000;
+  lastTime = timestamp;
+
+  if (state.running) {
+    state.v += state.a * dt;
+    if (state.v <= 0) {
+      state.v = 0;
+      state.running = false;
+    }
+    state.x += state.v * dt;
+    state.t += dt;
+
+    state.historial.push({ t: state.t, v: state.v, x: state.x });
+
+    const { Ffric, a, Fneta } = calcularFisica();
+    actualizarStats(Ffric, a, Fneta);
+  }
+
+  dibujarEscena();
+  dibujarGrafica();
+  requestAnimationFrame(loop);
+}
+
+// ============ BOTONES ============
+document.getElementById('btnPlay').addEventListener('click', () => {
+  if (state.v <= 0) reset();
+  state.running = !state.running;
+  document.getElementById('btnPlay').textContent =
+    state.running ? '⏸ Pausar' : '▶ Continuar';
+});
+
+document.getElementById('btnReset').addEventListener('click', () => {
+  document.getElementById('btnPlay').textContent = '▶ Iniciar simulación';
+  reset();
+});
+
+// Polyfill roundRect
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function(x,y,w,h,r) {
+    this.beginPath();
+    this.moveTo(x+r,y);
+    this.arcTo(x+w,y,x+w,y+h,r);
+    this.arcTo(x+w,y+h,x,y+h,r);
+    this.arcTo(x,y+h,x,y,r);
+    this.arcTo(x,y,x+w,y,r);
+    this.closePath();
+    return this;
+  };
+}
+
+// ============ INICIO ============
+reset();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
